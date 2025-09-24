@@ -9,3 +9,5 @@ print(type(dicionario))
 print(dicionario)
 
 print(dicionario["Nome"])
+
+###### PAREI NO 6 MIN
