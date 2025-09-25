@@ -12,7 +12,8 @@ while op != 4:
     
     if op == 1:
         #Inserir Ficha
-        
+        chave = input("Informe o que deseja cadastrar na ficha: ")
+        valor = input("Informe o dado que deseja cadastrar neste campo:")
     
     elif op == 2:
         #Recuperar dados
@@ -25,3 +26,5 @@ while op != 4:
         break
     else:
         print("Selecione uma opção valida")
+
+## PAREI NO 04:01
