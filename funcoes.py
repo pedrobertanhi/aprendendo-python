@@ -17,3 +17,32 @@ def converter_temperatura(temperatura:float, unidade_medida="Celsius"):
         return 0
     
 #Função exibir menu
+def exibir_menu():
+    print("MENU")
+    print("1 - Calcular velocidade media")
+    print("2 - Converter temperatura")
+    print("3 - sair")
+    
+    
+#FUNÇÃO PRA CHAMAR OUTRAS OPÇÕES
+def aluno_de_fisica():
+    op = 0
+    while op != 3:
+        exibir_menu()
+        op = int(input("Informe a opção desejada: "))
+        if op == 1:
+            distancia_percorrida = float(input("Informe a distância: "))
+            tempo_viagem = float(input("Informe o tempo da viagem: "))
+            medida = input("Informe a unidade de medida: ")
+            print(f"A velocidade média é {calcular_elocidade_media(distancia_percorrida, tempo_viagem, medida)}")
+        
+        elif op == 2:   
+            temperatura_informada = float(input("Informe a temperatura que deseja converter: "))
+            medida = input("A temperatura informada está em celsius ou fahrenhit")
+            print(f"O resultado da conversão é {converter_temperatura(temperatura_informada, medida)}")
+        
+        elif op == 3:
+            print("Saindo ...")
+            break
+        else:
+            print("Opção Invalida")
