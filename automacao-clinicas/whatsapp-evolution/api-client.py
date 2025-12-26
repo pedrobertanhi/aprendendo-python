@@ -104,7 +104,12 @@ class EvolutionAPIClient:
             return response.json()
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"Erro na requisição: {str(e)}")
+            logger.error(
+                f"Erro na requisição: {str(e)} | "
+                f"Method: {method} | "
+                f"URL: {url} | "
+                f"Data: {data}"
+            )
             raise
     
     def send_text(self, number: str, text: str, 

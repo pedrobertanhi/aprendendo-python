@@ -271,7 +271,7 @@ class PricingCalculator:
         # ROI
         net_benefit = total_monthly_benefit - monthly_cost
         roi_percentage = (net_benefit / monthly_cost) * 100 if monthly_cost > 0 else 0
-        payback_months = monthly_cost / net_benefit if net_benefit > 0 else float('inf')
+        payback_months = monthly_cost / net_benefit if net_benefit > 0 else None  # None indica que não há retorno
         
         return {
             'monthly_cost': monthly_cost,
