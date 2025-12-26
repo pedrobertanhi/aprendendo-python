@@ -1,0 +1,271 @@
+{
+  "name": "WhatsApp Agendamento - Workflow Principal",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook - Mensagens WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "whatsapp-messages"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extrai informações da mensagem\nconst data = $input.item.json;\n\n// Dados do usuário\nconst userPhone = data.data?.key?.remoteJid?.split('@')[0] || '';\nconst isFromMe = data.data?.key?.fromMe || false;\n\n// Ignorar mensagens próprias\nif (isFromMe) {\n  return [];\n}\n\n// Conteúdo da mensagem\nconst message = data.data?.message?.conversation || \n                data.data?.message?.extendedTextMessage?.text || \n                data.data?.message?.buttonsResponseMessage?.selectedButtonId || \n                data.data?.message?.listResponseMessage?.singleSelectReply?.selectedRowId || \n                '';\n\nreturn [{\n  json: {\n    userPhone: userPhone,\n    message: message.trim().toLowerCase(),\n    timestamp: Date.now(),\n    rawData: data\n  }\n}];"
+      },
+      "name": "Extrair Dados Usuário",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "key": "=state:{{$json.userPhone}}"
+      },
+      "name": "Redis - Buscar Estado",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "credentials": {
+        "redis": {
+          "id": "1",
+          "name": "Redis State"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse estado atual\nlet currentState = 'IDLE';\nlet context = {};\n\nif ($input.item.json.value) {\n  try {\n    const stateData = JSON.parse($input.item.json.value);\n    currentState = stateData.state || 'IDLE';\n    context = stateData.context || {};\n  } catch(e) {\n    console.error('Erro ao parsear estado:', e);\n  }\n}\n\nreturn [{\n  json: {\n    ...$input.item.json,\n    currentState: currentState,\n    context: context\n  }\n}];"
+      },
+      "name": "Parse Estado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.currentState}}",
+              "operation": "equals",
+              "value2": "IDLE"
+            }
+          ]
+        }
+      },
+      "name": "Switch - Estado Atual",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [1120, 300],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Menu Principal\nconst menuMessage = `👋 Olá! Bem-vindo à *Clínica Saúde Total*\\n\\nComo posso ajudar você hoje?\\n\\n*1* - 📅 Agendar consulta\\n*2* - 🔄 Remarcar consulta\\n*3* - ❌ Cancelar consulta\\n*4* - 📞 Falar com atendente\\n\\n_Digite o número da opção desejada_`;\n\nreturn [{\n  json: {\n    userPhone: $input.item.json.userPhone,\n    message: menuMessage,\n    nextState: 'MENU_PRINCIPAL',\n    context: {}\n  }\n}];"
+      },
+      "name": "Mostrar Menu Principal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1340, 180]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Processar escolha do menu\nconst choice = $input.item.json.message;\nlet responseMessage = '';\nlet nextState = 'MENU_PRINCIPAL';\nlet context = {};\n\nswitch(choice) {\n  case '1':\n    nextState = 'AGENDAMENTO_SELECAO_PROFISSIONAL';\n    responseMessage = `📋 *Agendamento de Consulta*\\n\\nEscolha o profissional:\\n\\n*1* - Dr. João Silva - Cardiologista\\n*2* - Dra. Maria Santos - Dermatologista\\n*3* - Dr. Pedro Costa - Ortopedista\\n*4* - Dra. Ana Oliveira - Pediatra\\n\\n_Digite o número do profissional_`;\n    break;\n    \n  case '2':\n    nextState = 'REMARCACAO_INICIO';\n    responseMessage = `🔄 *Remarcar Consulta*\\n\\nBuscando suas consultas agendadas...`;\n    break;\n    \n  case '3':\n    nextState = 'CANCELAMENTO_INICIO';\n    responseMessage = `❌ *Cancelar Consulta*\\n\\nBuscando suas consultas agendadas...`;\n    break;\n    \n  case '4':\n    nextState = 'IDLE';\n    responseMessage = `📞 Transferindo para atendente...\\n\\nUm momento, por favor.`;\n    // Aqui você pode integrar com sistema de tickets\n    break;\n    \n  default:\n    responseMessage = '❌ Opção inválida. Por favor, escolha uma opção de 1 a 4.';\n}\n\nreturn [{\n  json: {\n    userPhone: $input.item.json.userPhone,\n    message: responseMessage,\n    nextState: nextState,\n    context: context\n  }\n}];"
+      },
+      "name": "Processar Menu",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1340, 400]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=state:{{$json.userPhone}}",
+        "value": "={{JSON.stringify({state: $json.nextState, context: $json.context, last_update: new Date().toISOString()})}}",
+        "expire": true,
+        "ttl": 600
+      },
+      "name": "Redis - Salvar Estado",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [1560, 300],
+      "credentials": {
+        "redis": {
+          "id": "1",
+          "name": "Redis State"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{$env.EVOLUTION_API_URL}}/message/sendText/{{$env.INSTANCE_NAME}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{$json.userPhone}}"
+            },
+            {
+              "name": "text",
+              "value": "={{$json.message}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Enviar Mensagem WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1780, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "Evolution API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"success\": true, \"message\": \"Processed\"}",
+        "options": {}
+      },
+      "name": "Resposta Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2000, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Rate Limiting Check\nconst userPhone = $input.item.json.userPhone;\n\n// Aqui você implementaria verificação no Redis\n// Por simplicidade, apenas passa adiante\n\nreturn [$input.item.json];"
+      },
+      "name": "Rate Limit Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [680, 180]
+    }
+  ],
+  "connections": {
+    "Webhook - Mensagens WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Extrair Dados Usuário",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair Dados Usuário": {
+      "main": [
+        [
+          {
+            "node": "Redis - Buscar Estado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis - Buscar Estado": {
+      "main": [
+        [
+          {
+            "node": "Parse Estado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Estado": {
+      "main": [
+        [
+          {
+            "node": "Switch - Estado Atual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Estado Atual": {
+      "main": [
+        [
+          {
+            "node": "Mostrar Menu Principal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processar Menu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mostrar Menu Principal": {
+      "main": [
+        [
+          {
+            "node": "Redis - Salvar Estado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Menu": {
+      "main": [
+        [
+          {
+            "node": "Redis - Salvar Estado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis - Salvar Estado": {
+      "main": [
+        [
+          {
+            "node": "Enviar Mensagem WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Mensagem WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Resposta Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "updatedAt": "2024-12-26T00:00:00.000Z",
+  "versionId": "1"
+}
